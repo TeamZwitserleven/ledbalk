@@ -8,7 +8,8 @@ import (
 )
 
 func main() {
-	white := []byte{0xff, 0xff, 0xff}
+	//white := []byte{0xff, 0xff, 0xff}
+	white := []byte{0xfe, 0xe5, 0xac}
 	red := []byte{0x4B, 0x17, 0x0A}
 	yellow := []byte{0xEE, 0x95, 0x28}
 	//	gray := []byte{0x11, 0x11, 0x11}
@@ -56,7 +57,7 @@ func main() {
 		} else if i%4 == 3 {
 			suffix = suffix + "\n"
 		}
-		fmt.Printf("\t0x%02x%02x%02x%s", c[0], c[1], c[2], suffix)
+		fmt.Printf("\t0x%02x%02x%02x%s", c[0]/2, c[1]/2, c[2]/2, suffix)
 	}
 	fmt.Printf(" };\n")
 
@@ -75,5 +76,5 @@ func stepValue(begin, end byte, percentage float64) byte {
 	r := byte(float64(begin) + d)
 
 	//fmt.Printf("B=%d, E=%d, Perc=%v --> d=%v, r=%v\n", begin, end, percentage, d, r)
-	return r / 2
+	return r
 }
