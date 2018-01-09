@@ -17,8 +17,8 @@
 
 byte timeOfDay;
 
-#define TIMEOFDAYPIN1 8
-#define TIMEOFDAYPIN2 9
+#define TIMEOFDAYPIN1 11
+#define TIMEOFDAYPIN2 12
 
 #define MORNING   0x00
 #define AFTERNOON 0x01 
@@ -33,14 +33,8 @@ Adafruit_NeoPixel pixels = Adafruit_NeoPixel(NUMPIXELS, PIN, NEO_GRB + NEO_KHZ80
 int delayval = 50; // delay for half a second
 
 void setup() {
-  // This is for Trinket 5V 16MHz, you can remove these three lines if you are not using a Trinket
-#if defined (__AVR_ATtiny85__)
-  if (F_CPU == 16000000) clock_prescale_set(clock_div_1);
-#endif
-  // End of trinket special code
-
-  pinMode(TIMEOFDAYPIN1, INPUT);
-  pinMode(TIMEOFDAYPIN2, INPUT);
+  pinMode(TIMEOFDAYPIN1, INPUT_PULLUP);
+  pinMode(TIMEOFDAYPIN2, INPUT_PULLUP);
 
   //pixels.setBrightness(BRIGHTNESS);
   pixels.begin(); // This initializes the NeoPixel library.
@@ -88,40 +82,52 @@ uint32_t colorTable[] = {
 void loop() {
   static int s = 0;
   static int sOffset = 0;
-  static int todChangeStart = 0;
-  static int loopDelay = 2500;
+  static uint32_t c = 0x00FF00;
+  static bool b = 0;
 
-  byte tod = (digitalRead(TIMEOFDAYPIN1) << 1) || digitalRead(TIMEOFDAYPIN2);
+  byte tod = 0;
+  if (digitalRead(TIMEOFDAYPIN1) == HIGH) {
+    tod |= 0x01;
+  }
+  if (digitalRead(TIMEOFDAYPIN2) == HIGH) {
+    tod |= 0x02;
+  }
+  //Serial.println(tod);
   if (tod != timeOfDay) {
     timeOfDay = tod;
     s = 0;
-    int now = millis();
-    if (todChangeStart != 0) {
-      loopDelay = (now - todChangeStart) / TODCOLORS;
-    }
-    todChangeStart = now;
+    digitalWrite(LED_BUILTIN, b);
+    b = !b;
     switch (timeOfDay) {
       case MORNING:
         sOffset = 0;
+        //pixels.setBrightness(192);
+        c = 0x6e4312;
         break;
       case AFTERNOON:
         sOffset = TODCOLORS;
+        //pixels.setBrightness(255);
+        c = 0x76684e;
         break;
       case EVENING:
         sOffset = TODCOLORS + TODCOLORS;
+        //pixels.setBrightness(128);
+        c = 0x3e281b;
         break;
       case NIGHT:
         sOffset = TODCOLORS + TODCOLORS + TODCOLORS;
+        //pixels.setBrightness(64);
+        c = 0x3e281b;
         break;
     }
+    for (int i = 0; i < NUMPIXELS; i++) {
+      //c = colorTable[/*s+*/ sOffset];
+      pixels.setPixelColor(i, c);
+    }
+    pixels.show(); // This sends the updated pixel color to the hardware.
   }
 
-  for (int i = 0; i < NUMPIXELS; i++) {
-    uint32_t c = colorTable[s];
-    pixels.setPixelColor(i, c); // Moderately bright green color.
-  }
-  pixels.show(); // This sends the updated pixel color to the hardware.
-  delay(loopDelay);
+  delay(500);
 
   if (s + 1 < TODCOLORS) {
     s++;
