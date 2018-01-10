@@ -1,21 +1,16 @@
-// NeoPixel Ring simple sketch (c) 2013 Shae Erisson
-// released under the GPLv3 license to match the rest of the AdaFruit NeoPixel library
-
-#include <Adafruit_NeoPixel.h>
-#ifdef __AVR__
-  #include <avr/power.h>
-#endif
+#include <FastLED.h>
 
 // Which pin on the Arduino is connected to the NeoPixels?
 // On a Trinket or Gemma we suggest changing this to 1
 #define PIN            6
 
 // How many NeoPixels are attached to the Arduino?
-#define NUMPIXELS      160
+#define NUMPIXELS      150
 
 #define BRIGHTNESS 255
 
 byte timeOfDay;
+CRGB leds[NUMPIXELS];
 
 #define TIMEOFDAYPIN1 11
 #define TIMEOFDAYPIN2 12
@@ -25,20 +20,7 @@ byte timeOfDay;
 #define EVENING   0x02
 #define NIGHT     0x03
 
-// When we setup the NeoPixel library, we tell it how many pixels, and which pin to use to send signals.
-// Note that for older NeoPixel strips you might need to change the third parameter--see the strandtest
-// example for more information on possible values.
-Adafruit_NeoPixel pixels = Adafruit_NeoPixel(NUMPIXELS, PIN, NEO_GRB + NEO_KHZ800);
-
 int delayval = 50; // delay for half a second
-
-void setup() {
-  pinMode(TIMEOFDAYPIN1, INPUT_PULLUP);
-  pinMode(TIMEOFDAYPIN2, INPUT_PULLUP);
-
-  //pixels.setBrightness(BRIGHTNESS);
-  pixels.begin(); // This initializes the NeoPixel library.
-}
 
 #define NUMCOLORS 128
 #define TODCOLORS (NUMCOLORS/4)
@@ -76,13 +58,29 @@ uint32_t colorTable[] = {
         0x4f3b2a,       0x53402e,       0x574532,       0x5c4a36,
         0x604f3a,       0x64533d,       0x685841,       0x6c5d45 };
 
+static CHSV colorPalette[] {
+  CHSV(68, 200, 180), // Morning
+  CHSV(64, 40, 255), // Afternoon
+  CHSV(25, 240, 240), // Evening 
+  CHSV(140, 140, 120)  // Night
+};
 
+static void showStaticColor(CRGB c) {
+  fill_solid(leds, NUMPIXELS, c);
+  FastLED.show();
+}
 
-            
+void setup() {
+  pinMode(TIMEOFDAYPIN1, INPUT_PULLUP);
+  pinMode(TIMEOFDAYPIN2, INPUT_PULLUP);
+
+  FastLED.addLeds<NEOPIXEL, PIN>(leds, NUMPIXELS);
+  showStaticColor(CRGB::Blue);
+}
+
 void loop() {
   static int s = 0;
-  static int sOffset = 0;
-  static uint32_t c = 0x00FF00;
+  static bool gotSignal = 0;
   static bool b = 0;
 
   byte tod = 0;
@@ -92,45 +90,25 @@ void loop() {
   if (digitalRead(TIMEOFDAYPIN2) == HIGH) {
     tod |= 0x02;
   }
+
   //Serial.println(tod);
   if (tod != timeOfDay) {
     timeOfDay = tod;
-    s = 0;
+    gotSignal = 1;
     digitalWrite(LED_BUILTIN, b);
     b = !b;
-    switch (timeOfDay) {
-      case MORNING:
-        sOffset = 0;
-        //pixels.setBrightness(192);
-        c = 0x6e4312;
-        break;
-      case AFTERNOON:
-        sOffset = TODCOLORS;
-        //pixels.setBrightness(255);
-        c = 0x76684e;
-        break;
-      case EVENING:
-        sOffset = TODCOLORS + TODCOLORS;
-        //pixels.setBrightness(128);
-        c = 0x3e281b;
-        break;
-      case NIGHT:
-        sOffset = TODCOLORS + TODCOLORS + TODCOLORS;
-        //pixels.setBrightness(64);
-        c = 0x3e281b;
-        break;
-    }
-    for (int i = 0; i < NUMPIXELS; i++) {
-      //c = colorTable[/*s+*/ sOffset];
-      pixels.setPixelColor(i, c);
-    }
-    pixels.show(); // This sends the updated pixel color to the hardware.
+    showStaticColor(colorPalette[timeOfDay]);
   }
 
-  delay(500);
-
-  if (s + 1 < TODCOLORS) {
+  if (!gotSignal) {
+    showStaticColor(colorPalette[s]);
     s++;
+    if (s == 4) {
+      s = 0;
+    }
+    delay(2500);
+  } else {
+    delay(2500);
   }
 }
 
