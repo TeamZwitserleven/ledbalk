@@ -10,33 +10,30 @@ static const String msgTypeTimeChanged = "time-changed";
 #define PIN            D1
 
 // How many NeoPixels are attached to the Arduino?
-#define NUMPIXELS    3//  150
+#define NUMPIXELS    150
 
 #define BRIGHTNESS 255
 
-byte timeOfDay;
-byte receivedTimeOfDay;
+byte receivedHour = 0;
 CRGB leds[NUMPIXELS];
 
-#define MORNING   0x00
-#define AFTERNOON 0x01 
-#define EVENING   0x02
-#define NIGHT     0x03
-
 static CHSV colorPalette[] {
-  CHSV(68, 200, 180), // Morning
-  CHSV(64, 40, 255), // Afternoon
-  CHSV(25, 240, 240), // Evening 
-  CHSV(140, 140, 120)  // Night
+  CHSV(140, 140, 120),  // Night
+  CHSV(68, 200, 180),   // Morning
+  CHSV(64, 40, 255),    // Afternoon
+  CHSV(25, 240, 240)    // Evening 
 };
 
-#define STEPS 32
+#define STEPS 36
 static CHSV colorSteps[STEPS * 4];
+#define STEPSPERHOUR ((STEPS*4)/24)
 
-static void showStaticColor(CRGB c) {
-  fill_solid(leds, NUMPIXELS, c);
+static void showStaticColor(CRGB first, CRGB c) {
+  if (NUMPIXELS > 0) {
+    fill_solid(&leds[1], NUMPIXELS-1, c);
+  }
+  fill_solid(leds, 1, first);
   FastLED.show();
-
 }
 
 void setupLedBalk() {
@@ -45,7 +42,6 @@ void setupLedBalk() {
   Serial.println("setupLedBalk #2");
 
   fill_gradient(colorSteps, STEPS*0, colorPalette[0], (STEPS*0)+(STEPS-1), colorPalette[1]);
-  Serial.println("setupLedBalk #3");
   fill_gradient(colorSteps, STEPS*1, colorPalette[1], (STEPS*1)+(STEPS-1), colorPalette[2]);
   fill_gradient(colorSteps, STEPS*2, colorPalette[2], (STEPS*2)+(STEPS-1), colorPalette[3]);
   fill_gradient(colorSteps, STEPS*3, colorPalette[3], (STEPS*3)+(STEPS-1), colorPalette[0]);
@@ -53,7 +49,7 @@ void setupLedBalk() {
 
   FastLED.addLeds<NEOPIXEL, PIN>(leds, NUMPIXELS);
   Serial.println("setupLedBalk #5");
-  showStaticColor(CRGB::Blue);
+  showStaticColor(CRGB::Red, CRGB::Blue);
   Serial.println("setupLedBalk #6");
 }
 
@@ -63,29 +59,30 @@ void loopLedBalk() {
   static bool b = 0;
   static int step = 0;
   static int lastChange = 0;
-  static int interval = 50;
+  static int interval = 750;
+  static int hour = 0;
 
   //Serial.println(tod);
-  if (receivedTimeOfDay != timeOfDay) {
-    timeOfDay = receivedTimeOfDay;
+  if (receivedHour != hour) {
+    hour = receivedHour;
     gotSignal = 1;
     digitalWrite(LED_BUILTIN, b);
     b = !b;
     int now = millis();
     if (lastChange != 0) {
-      interval = (now - lastChange) / STEPS;
+      interval = (now - lastChange) / STEPSPERHOUR;
     }
     lastChange = now;
     step = 0;
   }
 
-  int offset = (gotSignal) ? (timeOfDay * STEPS) : (s * STEPS);
-  showStaticColor(colorSteps[offset + step]);
-  if (step + 1 < STEPS) {
+  int offset = (gotSignal) ? (hour * STEPSPERHOUR) : (s * STEPSPERHOUR);
+  showStaticColor(CRGB::Red, colorSteps[offset + step]);
+  if (step + 1 < STEPSPERHOUR) {
     step++;    
   } else {
     if (!gotSignal) {
-      s = (s+1) % 4;
+      s = (s+1) % 24;
       step = 0;
     }
   }
@@ -96,19 +93,13 @@ bool parseMessage(const JsonObject &source, byte* msg, int &msgLen, int maxMsgLe
   const String& msgType = source["type"];
   if (msgType.equals(msgTypeTimeChanged)) {
     uint8_t hour = source["hour"] | 0;
-    uint8_t minute = source["minute"] | 0;
+    //uint8_t minute = source["minute"] | 0;
 
-    if ((hour >= 7) && (hour < 12)) {
-      receivedTimeOfDay = MORNING;  
-    } else if (hour < 18) {
-      receivedTimeOfDay = AFTERNOON;
-    } else if (hour < 23) {
-      receivedTimeOfDay = EVENING;
-    } else {
-      receivedTimeOfDay = NIGHT;
+    if ((hour >= 0) && (hour < 24)) {
+      receivedHour = hour;
     }
     Serial.print("Set timeofday to ");
-    Serial.print(receivedTimeOfDay);
+    Serial.print(receivedHour);
     Serial.println();
     return true;
   }
