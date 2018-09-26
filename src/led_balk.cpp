@@ -2,6 +2,7 @@
 
 #include "led_balk.h"
 #include <FastLED.h>
+#include "mqtt.h"
 
 static const String msgTypeTimeChanged = "time-changed";
 
@@ -16,6 +17,8 @@ static const String msgTypeTimeChanged = "time-changed";
 
 byte receivedHour = 0;
 CRGB leds[NUMPIXELS];
+
+#define SIGNAL_TIMEOUT 2*60*1000 // Time in which we expect to receive a new "hour" (in ms).
 
 static CHSV colorPalette[] {
   CHSV(140, 140, 120),  // Night
@@ -61,11 +64,15 @@ void loopLedBalk() {
   static int lastChange = 0;
   static int interval = 750;
   static int hour = 0;
+  static word now;
+  static word lastSignal;
+  now = millis();
 
   //Serial.println(tod);
   if (receivedHour != hour) {
     hour = receivedHour;
     gotSignal = 1;
+    lastSignal = now;
     digitalWrite(LED_BUILTIN, b);
     b = !b;
     int now = millis();
@@ -74,10 +81,17 @@ void loopLedBalk() {
     }
     lastChange = now;
     step = 0;
+  } else {
+    if ((now - lastSignal) > SIGNAL_TIMEOUT) {
+      Serial.println("Lost signal");
+      gotSignal = 0;
+    }
   }
 
   int offset = (gotSignal) ? (hour * STEPSPERHOUR) : (s * STEPSPERHOUR);
-  showStaticColor(CRGB::Red, colorSteps[offset + step]);
+  CRGB color = colorSteps[offset + step];
+  CRGB firstColor = (gotSignal) ? color : (isMqttConnected()) ? CRGB::Blue : CRGB::Red;
+  showStaticColor(firstColor, color);
   if (step + 1 < STEPSPERHOUR) {
     step++;    
   } else {
